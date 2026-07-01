@@ -1,0 +1,9 @@
+{
+  "name": "preflight-pine-v6",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PREFLIGHT - Pine Script v6 static validator (Glass Cockpit)",
+  "scripts": {
+    "start": "npx --yes serve -s . -l ${PORT:-3000}"
+  }
+}

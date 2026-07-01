@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PREFLIGHT — Pine Script v6 Cockpit</title>
+<meta name="description" content="PREFLIGHT — בדיקת טרום-טיסה סטטית, ניתוח ביצועים ומפת כיסוי ל-Pine Script v6.">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 34 34'%3E%3Ccircle cx='17' cy='17' r='13' fill='%230A0C10'/%3E%3Ccircle cx='17' cy='17' r='12.5' fill='none' stroke='rgba(255,255,255,0.15)' stroke-width='2.5'/%3E%3Cpath d='M 17 4.5 A 12.5 12.5 0 1 1 6.7 24.3' fill='none' stroke='%235FB8E8' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='17' cy='17' r='2.6' fill='%23A78BFA'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#0A0C10;
+    --bg-1:#0D1117;
+    --glass:rgba(255,255,255,0.045);
+    --glass-strong:rgba(255,255,255,0.075);
+    --glass-border:rgba(255,255,255,0.10);
+    --glass-border-bright:rgba(255,255,255,0.22);
+    --text:#EDF0F5;
+    --text-dim:#9AA4B2;
+    --text-faint:#5C6675;
+    --pass:#34D399;
+    --pass-dim:rgba(52,211,153,0.14);
+    --warn:#F5A623;
+    --warn-dim:rgba(245,166,35,0.14);
+    --error:#FB5D5D;
+    --error-dim:rgba(251,93,93,0.14);
+    --info:#5FB8E8;
+    --info-dim:rgba(95,184,232,0.14);
+    --violet:#A78BFA;
+    --font-display:'IBM Plex Sans',system-ui,-apple-system,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+    --r-lg:20px;
+    --r-md:13px;
+    --r-sm:8px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background-color:var(--bg-0);
+    background-image:
+      radial-gradient(900px 520px at 6% -8%, rgba(167,139,250,0.16), transparent 60%),
+      radial-gradient(900px 600px at 102% -4%, rgba(95,184,232,0.15), transparent 55%),
+      radial-gradient(800px 520px at 100% 105%, rgba(52,211,153,0.10), transparent 55%),
+      radial-gradient(750px 520px at -2% 105%, rgba(245,166,35,0.08), transparent 55%),
+      linear-gradient(180deg, var(--bg-0), var(--bg-1) 50%, var(--bg-0));
+    background-attachment:fixed;
+    color:var(--text);
+    font-family:var(--font-display);
+    font-size:15px;
+    line-height:1.55;
+    min-height:100vh;
+  }
+  .ltr{direction:ltr;unicode-bidi:isolate;text-align:left;}
+  a{color:var(--info);}
+  button{font-family:inherit;cursor:pointer;}
+  button:focus-visible, input:focus-visible, textarea:focus-visible{
+    outline:2px solid var(--info); outline-offset:2px;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important;}
+  }
+
+  .wrap{max-width:1220px;margin:0 auto;padding:18px 16px 60px;}
+
+  /* ---------- glass primitive ---------- */
+  .glass{
+    background:var(--glass);
+    backdrop-filter:blur(22px) saturate(140%);
+    -webkit-backdrop-filter:blur(22px) saturate(140%);
+    border:1px solid var(--glass-border);
+    border-radius:var(--r-lg);
+    box-shadow:0 1px 0 rgba(255,255,255,0.05) inset, 0 24px 50px -28px rgba(0,0,0,0.7);
+    position:relative;
+    overflow:hidden;
+  }
+  .glass::before{
+    content:'';
+    position:absolute;inset:0;border-radius:inherit;padding:1px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0) 38%);
+    -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite:xor; mask-composite:exclude;
+    pointer-events:none;
+  }
+  .glass-strong{background:var(--glass-strong);}
+
+  /* ---------- header ---------- */
+  header{padding:8px 4px 18px;}
+  .brand-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .brand-mark{flex:0 0 auto;display:block;filter:drop-shadow(0 0 10px rgba(95,184,232,0.35));}
+  .brand-word{font-family:var(--font-mono);font-weight:700;font-size:19px;letter-spacing:.05em;color:var(--text);}
+  .brand-word .accent{color:var(--info);}
+  .brand-tag{margin-inline-start:auto;font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;color:var(--text-faint);border:1px solid var(--glass-border);border-radius:999px;padding:3px 9px;white-space:nowrap;}
+  .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.16em;color:var(--info);text-transform:uppercase;margin-bottom:8px;}
+  h1{
+    font-size:25px;margin:0 0 6px;font-weight:800;letter-spacing:-.01em;
+    background:linear-gradient(95deg, var(--text) 30%, var(--violet) 75%, var(--info));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .subtitle{color:var(--text-dim);font-size:14px;margin:0;max-width:64ch;}
+
+  /* ---------- tabs ---------- */
+  .tabbar{display:flex;gap:6px;margin-top:18px;padding:6px;overflow-x:auto;}
+  .tab-btn{
+    background:transparent;border:1px solid transparent;color:var(--text-dim);
+    border-radius:999px;padding:9px 16px;font-size:13px;font-weight:600;
+    white-space:nowrap;min-height:38px;flex:0 0 auto;
+  }
+  .tab-btn.active{
+    background:var(--glass-strong);border-color:var(--glass-border-bright);color:var(--text);
+    box-shadow:0 1px 0 rgba(255,255,255,0.08) inset;
+  }
+  .tab-btn:hover:not(.active){color:var(--text);}
+  .tab-panel{margin-top:10px;}
+  .tab-panel[hidden]{display:none;}
+
+  /* ---------- generic layout ---------- */
+  .grid2{display:grid;grid-template-columns:1.05fr 1fr;gap:16px;align-items:start;}
+  @media (max-width:900px){ .grid2{grid-template-columns:1fr;} }
+  .panel-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--glass-border);flex-wrap:wrap;gap:8px;}
+  .panel-title{font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:8px;}
+  .panel-title .n{font-family:var(--font-mono);font-size:10.5px;color:var(--text-faint);}
+  .panel-body{padding:16px;}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    background:var(--glass-strong);border:1px solid var(--glass-border-bright);color:var(--text);
+    border-radius:var(--r-sm);padding:9px 14px;font-size:12.5px;font-weight:600;
+    display:inline-flex;align-items:center;gap:6px;min-height:38px;
+  }
+  .btn:hover{border-color:var(--info);}
+  .btn.primary{
+    background:linear-gradient(135deg, rgba(95,184,232,0.28), rgba(167,139,250,0.22));
+    border-color:rgba(95,184,232,0.45);
+  }
+  .btn.primary:hover{border-color:var(--info);box-shadow:0 0 0 3px rgba(95,184,232,0.12);}
+  .btn.ghost{background:transparent;border-color:var(--glass-border);}
+  .btn.small{padding:6px 10px;font-size:11.5px;min-height:30px;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  /* ---------- editor ---------- */
+  .editor-toolbar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  textarea#codeInput{
+    width:100%;min-height:340px;resize:vertical;
+    background:rgba(3,5,8,0.55);color:#D7E2EC;
+    border:1px solid var(--glass-border);border-radius:var(--r-md);
+    padding:13px 15px;font-family:var(--font-mono);font-size:13px;line-height:1.6;
+    white-space:pre;overflow:auto;
+  }
+  .meta-row{display:flex;justify-content:space-between;color:var(--text-faint);font-size:11.5px;margin-top:6px;font-family:var(--font-mono);}
+
+  /* ---------- score/gauge cluster ---------- */
+  .gauge-cluster{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:16px;}
+  .gauge-svg .gauge-arc{transition:stroke-dashoffset 900ms cubic-bezier(.4,0,.2,1);}
+  .gauge-value{font-family:var(--font-mono);font-size:26px;font-weight:700;fill:var(--text);}
+  .gauge-unit{font-family:var(--font-mono);font-size:10px;fill:var(--text-faint);}
+  .gauge-caption{display:flex;flex-direction:column;gap:2px;}
+  .gauge-label{font-weight:700;font-size:13.5px;}
+  .gauge-sublabel{color:var(--text-dim);font-size:11.5px;max-width:30ch;}
+  .dist-bar{display:flex;height:7px;border-radius:99px;overflow:hidden;width:100%;max-width:220px;background:rgba(255,255,255,0.06);}
+  .dist-seg{height:100%;}
+  .dist-legend{display:flex;gap:12px;margin-top:6px;font-size:11px;color:var(--text-dim);font-family:var(--font-mono);}
+  .dist-legend span{display:inline-flex;align-items:center;gap:4px;}
+  .dist-dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+
+  /* ---------- result cards ---------- */
+  .cat-group{margin-bottom:16px;}
+  .cat-head{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-faint);margin-bottom:9px;padding-bottom:6px;border-bottom:1px solid var(--glass-border);}
+  .issue-card{
+    border-radius:var(--r-md);padding:12px 14px;margin-bottom:9px;
+    background:var(--glass-strong);border:1px solid var(--glass-border);
+    border-inline-start:3px solid var(--info);
+    opacity:0;transform:translateY(6px);
+    animation:cardIn 420ms ease forwards;
+  }
+  @keyframes cardIn{ to{opacity:1;transform:translateY(0);} }
+  .issue-card.error{border-inline-start-color:var(--error);}
+  .issue-card.warning{border-inline-start-color:var(--warn);}
+  .issue-card.info{border-inline-start-color:var(--info);}
+  .issue-top{display:flex;align-items:flex-start;gap:8px;justify-content:space-between;}
+  .issue-title-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .sev-chip{font-family:var(--font-mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;letter-spacing:.04em;}
+  .sev-chip.error{background:var(--error-dim);color:var(--error);}
+  .sev-chip.warning{background:var(--warn-dim);color:var(--warn);}
+  .sev-chip.info{background:var(--info-dim);color:var(--info);}
+  .issue-title{font-weight:700;font-size:13px;}
+  .issue-detail{color:var(--text-dim);font-size:12.5px;margin-top:7px;white-space:pre-line;}
+  .issue-fix{margin-top:9px;background:rgba(3,5,8,0.55);border:1px solid var(--glass-border);border-radius:var(--r-sm);padding:9px 11px;font-family:var(--font-mono);font-size:12px;color:var(--pass);white-space:pre-wrap;}
+  .line-jump{flex:0 0 auto;font-family:var(--font-mono);font-size:11px;background:transparent;border:1px solid var(--glass-border);color:var(--text-dim);border-radius:var(--r-sm);padding:4px 9px;min-height:28px;}
+  .line-jump:hover{border-color:var(--info);color:var(--info);}
+  .empty-state{color:var(--text-faint);font-size:13px;padding:30px 6px;text-align:center;}
+
+  /* ---------- status banner ---------- */
+  .status-banner{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--r-md);margin:0 16px 14px;background:var(--glass-strong);border:1px solid var(--glass-border);}
+  .status-banner .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 12px currentColor;}
+  .status-banner.blocked .dot{background:var(--error);color:var(--error);}
+  .status-banner.review .dot{background:var(--warn);color:var(--warn);}
+  .status-banner.pass .dot{background:var(--pass);color:var(--pass);}
+  .status-banner.idle .dot{background:var(--text-faint);}
+  .status-banner .headline{font-weight:700;font-size:13.5px;}
+  .status-banner .sub{font-size:11.5px;color:var(--text-dim);}
+
+  /* ---------- library ---------- */
+  .lib-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .lib-row input[type=text]{flex:1;min-width:160px;background:rgba(3,5,8,0.5);color:var(--text);border:1px solid var(--glass-border);border-radius:var(--r-sm);padding:9px 11px;font-size:13px;min-height:38px;}
+  .lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-top:14px;}
+  .lib-card{background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:var(--r-md);padding:12px 13px;display:flex;flex-direction:column;gap:8px;}
+  .lib-card .name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .lib-card .date{font-size:10.5px;color:var(--text-faint);font-family:var(--font-mono);}
+  .lib-card .actions{display:flex;gap:6px;}
+  .lib-empty{color:var(--text-faint);font-size:12.5px;padding:8px 2px;grid-column:1/-1;}
+
+  /* ---------- performance tab ---------- */
+  .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  @media (max-width:520px){ .calc-grid{grid-template-columns:1fr;} }
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{font-size:12px;color:var(--text-dim);}
+  .field input[type=number]{background:rgba(3,5,8,0.5);color:var(--text);border:1px solid var(--glass-border);border-radius:var(--r-sm);padding:9px 10px;font-size:14px;font-family:var(--font-mono);min-height:38px;}
+  .checks{display:flex;flex-direction:column;gap:8px;margin-top:6px;}
+  .check-row{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-dim);}
+  .check-row input{width:16px;height:16px;}
+  .calc-err{color:var(--error);font-size:12.5px;margin-top:8px;}
+  .breakeven-wrap{margin-top:4px;}
+  .breakeven-track{position:relative;height:30px;border-radius:99px;background:rgba(255,255,255,0.06);border:1px solid var(--glass-border);overflow:hidden;}
+  .breakeven-fill{position:absolute;inset-block:0;inset-inline-start:0;border-radius:99px;transition:width 900ms cubic-bezier(.4,0,.2,1);width:0%;}
+  .breakeven-fill.good{background:linear-gradient(90deg, rgba(52,211,153,0.55), rgba(52,211,153,0.85));}
+  .breakeven-fill.warn{background:linear-gradient(90deg, rgba(245,166,35,0.55), rgba(245,166,35,0.85));}
+  .breakeven-fill.bad{background:linear-gradient(90deg, rgba(251,93,93,0.55), rgba(251,93,93,0.85));}
+  .breakeven-marker{position:absolute;inset-block:-3px;width:2px;background:#fff;left:0%;box-shadow:0 0 8px rgba(255,255,255,0.7);}
+  .breakeven-marker::after{content:'BREAKEVEN';position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-family:var(--font-mono);font-size:9px;color:var(--text-dim);white-space:nowrap;}
+  .breakeven-scale{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--text-faint);margin-top:6px;}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:16px;}
+  .stat-card{background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:var(--r-md);padding:11px 13px;}
+  .stat-card .k{font-size:11px;color:var(--text-dim);margin-bottom:4px;}
+  .stat-card .v{font-family:var(--font-mono);font-weight:700;font-size:17px;}
+  .verdict-box{margin-top:14px;padding:13px 14px;border-radius:var(--r-md);font-size:13px;line-height:1.65;background:var(--warn-dim);border:1px solid rgba(245,166,35,0.35);}
+  .verdict-box.good{background:var(--pass-dim);border-color:rgba(52,211,153,0.35);}
+  .verdict-box.bad{background:var(--error-dim);border-color:rgba(251,93,93,0.35);}
+
+  /* ---------- coverage tab ---------- */
+  .coverage-intro{padding:16px;color:var(--text-dim);font-size:13px;}
+  .rule-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;padding:0 16px 16px;}
+  .rule-card{background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:var(--r-sm);padding:10px 12px;display:flex;gap:9px;align-items:flex-start;}
+  .rule-id{font-family:var(--font-mono);font-size:10.5px;font-weight:700;color:var(--info);background:var(--info-dim);border-radius:6px;padding:2px 6px;flex:0 0 auto;}
+  .rule-t{font-size:12px;color:var(--text-dim);line-height:1.45;}
+  .not-covered{margin:0 16px 16px;padding:14px 16px;border-radius:var(--r-md);background:var(--error-dim);border:1px solid rgba(251,93,93,0.3);}
+  .not-covered h4{margin:0 0 8px;font-size:13px;}
+  .not-covered ul{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--text-dim);}
+
+  footer{margin-top:26px;text-align:center;color:var(--text-faint);font-size:11.5px;line-height:1.8;}
+  footer a{color:var(--text-dim);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand-row">
+      <svg class="brand-mark" width="32" height="32" viewBox="0 0 34 34">
+        <circle cx="17" cy="17" r="13" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="3"/>
+        <path d="M 17 4.5 A 12.5 12.5 0 1 1 6.7 24.3" fill="none" stroke="url(#brandGrad)" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="17" cy="17" r="2.6" fill="#A78BFA"/>
+        <defs><linearGradient id="brandGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#5FB8E8"/><stop offset="100%" stop-color="#A78BFA"/></linearGradient></defs>
+      </svg>
+      <span class="brand-word">PRE<span class="accent">FLIGHT</span></span>
+      <span class="brand-tag">PINE v6 · BUILD 2</span>
+    </div>
+    <div class="eyebrow">Pine Script v6 · Glass Cockpit Validator</div>
+    <h1>בדיקת טרום־טיסה ל-Pine Script v6</h1>
+    <p class="subtitle">בדיקה סטטית, ניתוח ביצועי בקטסט, ומפת כיסוי שקופה — לפני שמבזבזים סבב על TradingView.</p>
+  </header>
+
+  <nav class="tabbar glass" role="tablist">
+    <button class="tab-btn active" data-tab="validator" role="tab" aria-selected="true">בדיקה</button>
+    <button class="tab-btn" data-tab="performance" role="tab" aria-selected="false">ביצועים</button>
+    <button class="tab-btn" data-tab="coverage" role="tab" aria-selected="false">כיסוי</button>
+    <button class="tab-btn" data-tab="library" role="tab" aria-selected="false">ספרייה</button>
+  </nav>
+
+  <!-- ===== TAB: VALIDATOR ===== -->
+  <section class="tab-panel" data-panel="validator">
+    <div class="grid2">
+      <div class="glass">
+        <div class="panel-head"><span class="panel-title">קוד Pine Script</span><span id="lineCount" class="meta-row" style="margin:0;"></span></div>
+        <div class="panel-body">
+          <div class="editor-toolbar">
+            <button class="btn primary" id="runBtn">▶ הרץ בדיקה</button>
+            <button class="btn ghost small" id="clearBtn">נקה</button>
+            <button class="btn ghost small" id="loadCleanBtn">דוגמה תקינה</button>
+            <button class="btn ghost small" id="loadBuggyBtn">דוגמה עם בעיות</button>
+          </div>
+          <textarea id="codeInput" class="ltr" wrap="off" spellcheck="false" placeholder="//@version=6&#10;strategy(&quot;My Strategy&quot;, overlay = true)&#10;..."></textarea>
+          <div class="meta-row"><span id="charCount"></span><span>הקוד נשאר בדף הזה בלבד</span></div>
+          <div class="lib-row" style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--glass-border);">
+            <input type="text" id="saveNameInput" placeholder="שם לשמירה, למשל Edge Test v2.1">
+            <button class="btn small" id="saveBtn">שמור לספרייה</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass">
+        <div class="panel-head"><span class="panel-title">תוצאות</span><button class="btn small ghost" id="copyReportBtn" style="display:none;">העתק דוח</button></div>
+        <div id="statusBanner" class="status-banner idle" style="margin-top:14px;">
+          <span class="dot"></span>
+          <div><div class="headline">מחכה להרצה</div><div class="sub">הדבק קוד ולחץ "הרץ בדיקה"</div></div>
+        </div>
+        <div id="gaugeArea" class="gauge-cluster" style="display:none;"></div>
+        <div class="panel-body" style="padding-top:4px;">
+          <div id="resultsContainer" aria-live="polite">
+            <div class="empty-state">תוצאות הבדיקה יופיעו כאן, מקובצות לפי קטגוריה.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== TAB: PERFORMANCE ===== -->
+  <section class="tab-panel" data-panel="performance" hidden>
+    <div class="glass">
+      <div class="panel-head"><span class="panel-title">בדיקת סבירות לתוצאות בקטסט</span></div>
+      <div class="panel-body">
+        <p style="color:var(--text-dim);font-size:13px;margin-top:0;">לא בודק קוד — בודק אם המספרים מה-Strategy Tester בכלל מעידים על יתרון.</p>
+        <div class="calc-grid">
+          <div class="field"><label for="trades">מספר עסקאות</label><input type="number" id="trades" min="0" step="1" placeholder="120"></div>
+          <div class="field"><label for="winRate">אחוז הצלחה (%)</label><input type="number" id="winRate" min="0" max="100" step="0.1" placeholder="42"></div>
+          <div class="field"><label for="avgWin">רווח ממוצע (₪ או R)</label><input type="number" id="avgWin" min="0" step="0.01" placeholder="1.8"></div>
+          <div class="field"><label for="avgLoss">הפסד ממוצע — ערך מוחלט</label><input type="number" id="avgLoss" min="0" step="0.01" placeholder="1"></div>
+        </div>
+        <div class="checks">
+          <label class="check-row"><input type="checkbox" id="costsApplied"> עמלה + slippage נלקחו בחשבון</label>
+          <label class="check-row"><input type="checkbox" id="multiRegime"> נבדק על כמה סמלים/תקופות</label>
+        </div>
+        <div style="margin-top:14px;"><button class="btn primary" id="calcBtn">חשב</button></div>
+        <div id="calcErr" class="calc-err"></div>
+
+        <div id="calcOut" style="display:none;margin-top:18px;">
+          <div class="breakeven-wrap ltr">
+            <div class="breakeven-track">
+              <div id="breakevenFill" class="breakeven-fill"></div>
+              <div id="breakevenMarker" class="breakeven-marker"></div>
+            </div>
+            <div class="breakeven-scale"><span>0%</span><span>אחוז הצלחה בפועל מול נקודת איזון</span><span>100%</span></div>
+          </div>
+          <div class="stat-grid">
+            <div class="stat-card"><div class="k">יחס R</div><div class="v ltr" id="outR"></div></div>
+            <div class="stat-card"><div class="k">איזון נדרש</div><div class="v ltr" id="outBreakeven"></div></div>
+            <div class="stat-card"><div class="k">מרווח</div><div class="v ltr" id="outMargin"></div></div>
+            <div class="stat-card"><div class="k">Expectancy</div><div class="v ltr" id="outExpectancy"></div></div>
+            <div class="stat-card"><div class="k">גודל מדגם</div><div class="v" id="outSample" style="font-size:13px;"></div></div>
+          </div>
+          <div id="verdictBox" class="verdict-box"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== TAB: COVERAGE ===== -->
+  <section class="tab-panel" data-panel="coverage" hidden>
+    <div class="glass">
+      <div class="panel-head"><span class="panel-title">מפת כיסוי — מה הכלי בודק בפועל</span></div>
+      <p class="coverage-intro">רשימה מלאה ושקופה של כל 29 הכללים שהמנוע בודק, וכל אחד מהם נשען ישירות על ה-skills <b class="ltr" style="display:inline">pine-script-v6</b> / <b class="ltr" style="display:inline">repaint-audit</b> / <b class="ltr" style="display:inline">alerts-and-webhooks</b>. דוח נקי = "לא נמצא דבר מהרשימה הזו" — לא "הקוד תקין".</p>
+      <div id="ruleGrid" class="rule-grid"></div>
+      <div class="not-covered">
+        <h4>מה זה במפורש לא בודק</h4>
+        <ul id="notCoveredList"></ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== TAB: LIBRARY ===== -->
+  <section class="tab-panel" data-panel="library" hidden>
+    <div class="glass">
+      <div class="panel-head"><span class="panel-title">ספריית סקריפטים שמורים</span><button class="btn small ghost" id="refreshLibBtn">רענן</button></div>
+      <div class="panel-body">
+        <p style="color:var(--text-dim);font-size:13px;margin-top:0;">שמירה אישית ומקומית לכלי הזה — לא משותפת.</p>
+        <div id="libGrid" class="lib-grid"><div class="lib-empty">טוען…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    PREFLIGHT — כלי בדיקה סטטית פנימי. לא מחליף קומפילציה והרצה אמיתית ב-TradingView Pine Editor / Strategy Tester.<br>
+    <a href="https://www.tradingview.com/" target="_blank" rel="noopener">פתח את TradingView ↗</a>
+  </footer>
+
+</div>
+
+<script>
+/* ===================================================================
+   PURE-LOGIC:BEGIN  (no DOM access — kept separate so it's testable)
+   =================================================================== */
+
+const STATEFUL_TA = ['ema','sma','rma','wma','vwma','hma','alma','atr','rsi','cci','mfi','mom','roc',
+  'macd','stoch','dmi','barssince','valuewhen','crossover','crossunder','cross','highest','lowest',
+  'highestbars','lowestbars','change','cum','stdev','variance','dev','falling','rising','percentrank',
+  'percentile_linear_interpolation','percentile_nearest_rank','pivothigh','pivotlow','linreg','tr',
+  'vwap','supertrend'];
+
+const CATEGORY_LABELS = {
+  syntax: 'מבנה ותחביר v6',
+  repaint: 'ריפיינטינג ודליפת מידע עתידי',
+  alerts: 'התראות ו-Webhooks',
+  strategy: 'מציאותיות הגדרות אסטרטגיה'
+};
+const SEVERITY_ORDER = { error: 0, warning: 1, info: 2 };
+const SEVERITY_MARK = { error: '✕', warning: '▲', info: '●' };
+
+function escapeRegExp(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+function maskLine(line){
+  let masked = '';
+  let inString = false;
+  let quoteChar = '';
+  for (let i = 0; i < line.length; i++){
+    const ch = line[i];
+    if (inString){
+      if (ch === '\\' && i + 1 < line.length){
+        masked += '  ';
+        i++;
+        continue;
+      }
+      if (ch === quoteChar){ inString = false; }
+      masked += ' ';
+      continue;
+    }
+    if (ch === '"' || ch === "'"){
+      inString = true; quoteChar = ch; masked += ' '; continue;
+    }
+    if (ch === '/' && line[i+1] === '/'){
+      masked += ' '.repeat(line.length - i);
+      break;
+    }
+    masked += ch;
+  }
+  if (masked.length < line.length) masked += ' '.repeat(line.length - masked.length);
+  return masked;
+}
+
+function getIndent(line){
+  const m = line.match(/^[ \t]*/);
+  if (!m) return 0;
+  return m[0].replace(/\t/g, '    ').length;
+}
+
+function findMatchingParen(text, openIdx){
+  let depth = 0;
+  for (let i = openIdx; i < text.length; i++){
+    if (text[i] === '(') depth++;
+    else if (text[i] === ')'){
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+function buildLineOffsets(lines){
+  const offsets = [];
+  let pos = 0;
+  for (const l of lines){ offsets.push(pos); pos += l.length + 1; }
+  return offsets;
+}
+
+function indexToLine(offsets, idx){
+  let lo = 0, hi = offsets.length - 1, ans = 0;
+  while (lo <= hi){
+    const mid = (lo + hi) >> 1;
+    if (offsets[mid] <= idx){ ans = mid; lo = mid + 1; } else hi = mid - 1;
+  }
+  return ans + 1;
+}
+
+function findCalls(maskedFull, origFull, namePattern){
+  const calls = [];
+  const re = new RegExp(namePattern.source, 'g');
+  let m;
+  while ((m = re.exec(maskedFull)) !== null){
+    const openIdx = m.index + m[0].length - 1;
+    const closeIdx = findMatchingParen(maskedFull, openIdx);
+    if (closeIdx === -1) continue;
+    calls.push({
+      matchIndex: m.index, openIdx, closeIdx,
+      args: maskedFull.slice(openIdx + 1, closeIdx),
+      argsOriginal: origFull.slice(openIdx + 1, closeIdx)
+    });
+    re.lastIndex = closeIdx + 1;
+  }
+  return calls;
+}
+
+function runAllChecks(code){
+  const issues = [];
+  const rawLines = code.replace(/\r\n/g, '\n').split('\n');
+  const maskedLines = rawLines.map(maskLine);
+  const maskedFull = maskedLines.join('\n');
+  const origFull = rawLines.join('\n');
+  const offsets = buildLineOffsets(rawLines);
+
+  function add(line, severity, category, ruleId, title, detail, fix){
+    issues.push({ line: line || null, severity, category, ruleId, title, detail, fix: fix || null });
+  }
+
+  const openCount = (maskedFull.match(/\(/g) || []).length;
+  const closeCount = (maskedFull.match(/\)/g) || []).length;
+  if (openCount !== closeCount){
+    add(null, 'warning', 'syntax', 'S0', 'מספר סוגריים פותחים/סוגרים לא תואם',
+      'נספרו ' + openCount + ' סוגריים פותחים ו-' + closeCount + ' סוגרים. ייתכן שזו שגיאת תחביר שתמנע קומפילציה.');
+  }
+
+  const firstContentIdx = rawLines.findIndex(l => l.trim() !== '');
+  if (firstContentIdx === -1){
+    add(1, 'error', 'syntax', 'S1', 'הקובץ ריק', 'לא נמצא קוד לבדיקה.');
+  } else {
+    const firstLine = rawLines[firstContentIdx].trim();
+    if (firstLine !== '//@version=6'){
+      add(firstContentIdx + 1, 'error', 'syntax', 'S1', 'חסר //@version=6 כשורה הראשונה',
+        'בv6 השורה הראשונה שאינה ריקה חייבת להיות בדיוק //@version=6 — אחרת ה-Editor עלול להתייחס לסקריפט כגרסה אחרת וההתנהגות תשתנה בלי שגיאה ברורה.',
+        '//@version=6');
+    }
+  }
+  const versionMatches = maskedFull.match(/\/\/@version\s*=\s*\d+/g) || [];
+  if (versionMatches.length > 1){
+    add(1, 'warning', 'syntax', 'S2', 'נמצא יותר מתג //@version אחד', 'ודא שיש תג גרסה יחיד, בשורה הראשונה בלבד.');
+  }
+
+  const entryRe = /\b(indicator|strategy|library)\s*\(/g;
+  const entryMatches = [];
+  let em;
+  while ((em = entryRe.exec(maskedFull)) !== null){ entryMatches.push({ kind: em[1], idx: em.index }); }
+  if (entryMatches.length === 0){
+    add(1, 'error', 'syntax', 'S3', 'לא נמצאה קריאת indicator()/strategy()/library()',
+      'לכל סקריפט v6 חייבת להיות בדיוק נקודת כניסה אחת.');
+  } else if (entryMatches.length > 1){
+    entryMatches.forEach(e => {
+      add(indexToLine(offsets, e.idx), 'warning', 'syntax', 'S4', 'נמצאה יותר מקריאת נקודת־כניסה אחת',
+        'קריאת ' + e.kind + '() נוספת — בPine מותרת רק נקודת כניסה אחת לסקריפט.');
+    });
+  }
+
+  const hasIndicatorEntry = entryMatches.some(e => e.kind === 'indicator');
+  const hasStrategyEntry = entryMatches.some(e => e.kind === 'strategy');
+  const usesStrategyNamespace = /\bstrategy\.(entry|close|close_all|order|exit|position_size|opentrades|closedtrades)\b/.test(maskedFull);
+  if (hasIndicatorEntry && !hasStrategyEntry && usesStrategyNamespace){
+    add(null, 'error', 'syntax', 'S16', 'שימוש ב-strategy.* בתוך סקריפט indicator()',
+      'יש קריאות מתחום strategy.* (כמו strategy.entry) אבל נקודת הכניסה היא indicator() — זה לא יתקמפל. אם הכוונה לבדוק אסטרטגיה, יש להחליף ל-strategy(...).');
+  }
+
+  const hasDynamicRequestsFalse = /\bdynamic_requests\s*=\s*false\b/.test(maskedFull);
+  if (hasDynamicRequestsFalse){
+    maskedLines.forEach((ml, i) => {
+      const indent = getIndent(rawLines[i]);
+      if (indent > 0 && /\brequest\.\w+\s*\(/.test(ml)){
+        add(i + 1, 'error', 'syntax', 'S17', 'request.*() בתוך scope מקונן כש-dynamic_requests=false',
+          'כש-dynamic_requests=false מוגדר במפורש, קריאות request.*() חייבות לרוץ ב-scope גלובלי בלבד — קריאה מתוך if/for/פונקציה לא תתקמפל בv6.');
+      }
+    });
+  }
+
+  const udtTypes = new Set();
+  maskedLines.forEach(ml => {
+    const m = ml.match(/^\s*(?:export\s+)?type\s+(\w+)/);
+    if (m) udtTypes.add(m[1]);
+  });
+  const udtInstances = new Set();
+  maskedLines.forEach(ml => {
+    const m = ml.match(/(\w+)\s*=\s*(\w+)\.new\s*\(/);
+    if (m && udtTypes.has(m[2])) udtInstances.add(m[1]);
+  });
+
+  const knownBoolVars = new Set();
+  maskedLines.forEach(ml => {
+    const m = ml.match(/\bbool\s+(\w+)\s*=/);
+    if (m) knownBoolVars.add(m[1]);
+  });
+
+  const taNamesPattern = STATEFUL_TA.map(escapeRegExp).join('|');
+  const taCallRe = new RegExp('ta\\.(' + taNamesPattern + ')\\s*\\(', 'g');
+  const nestedLines = [], ternaryLines = [], shortCircuitLines = [];
+
+  maskedLines.forEach((ml, i) => {
+    const lineNo = i + 1;
+    const indent = getIndent(rawLines[i]);
+
+    if (/\bbool\s+\w+\s*=\s*na\b/.test(ml)){
+      add(lineNo, 'error', 'syntax', 'S5', "אי אפשר 'bool ... = na' ב-v6",
+        'ב-v6 ערך bool הוא תמיד true/false ולעולם לא na. אתחל ל-true או false.');
+    }
+
+    if (/^if\s+[A-Za-z_]\w*\s*$/.test(ml.trim())){
+      const bareIfMatch = ml.trim().match(/^if\s+([A-Za-z_]\w*)\s*$/);
+      if (bareIfMatch && !knownBoolVars.has(bareIfMatch[1])){
+        add(lineNo, 'info', 'syntax', 'S6', "תנאי if עם משתנה בודד — לוודא שהוא bool",
+          "ב-v6 אסור if עם ביטוי מספרי (צריך x != 0 וכו'). לא נמצאה הצהרת bool מפורשת למשתנה הזה בקובץ — אם הוא כבר bool (הוסק אוטומטית) זה תקין, רק לוודא.");
+      }
+    }
+
+    if (/\b\d+\s*\/\s*\d+\b/.test(ml)){
+      add(lineNo, 'info', 'syntax', 'S7', 'חלוקת שני מספרים שלמים מילוליים',
+        "ב-v6 'int/int' נותן תוצאה עם שבר (למשל 5/2=2.5), בניגוד ל-v5. אם רצית חלוקה שלמה — עטוף ב-int(...).");
+    }
+
+    udtInstances.forEach(v => {
+      const re = new RegExp('\\b' + escapeRegExp(v) + '\\.(\\w+)\\[(\\d+)\\]');
+      const mm = ml.match(re);
+      if (mm){
+        add(lineNo, 'error', 'syntax', 'S8', '[] ישירות על שדה UDT (' + v + '.' + mm[1] + ')',
+          'ב-v6 אסור [] ישירות על שדה אובייקט. השתמש ב-(' + v + '[' + mm[2] + ']).' + mm[1] + ' — קודם history על האובייקט, ואז גישה לשדה.',
+          '(' + v + '[' + mm[2] + ']).' + mm[1]);
+      }
+    });
+
+    if (/\b\d+\[\d+\]/.test(ml) || /color\.\w+\[\d+\]/.test(ml)){
+      add(lineNo, 'warning', 'syntax', 'S9', 'היסטוריית [] על קבוע/literal',
+        'ב-v6 אסור [] ישירות על מספר קבוע או קבוע צבע (למשל 6[1] או color.red[2]).');
+    }
+
+    if (/\btransp\s*=/.test(ml)){
+      add(lineNo, 'error', 'syntax', 'S11', 'פרמטר transp הוסר ב-v6',
+        'השתמש ב-color.new(הצבע, ערך_שקיפות) במקום פרמטר transp נפרד.', 'color.new(myColor, 50)');
+    }
+
+    if (/linewidth\s*=\s*0\b/.test(ml)){
+      add(lineNo, 'warning', 'syntax', 'S12', 'linewidth=0 לא חוקי', 'ב-v6 linewidth חייב להיות 1 ומעלה.');
+    }
+
+    if (/timeframe\.period\s*==\s*"(D|W|M|Y)"/.test(ml)){
+      add(lineNo, 'warning', 'syntax', 'S13', 'השוואת timeframe.period לאות בודדת',
+        'ב-v6 ל-timeframe.period תמיד יש מכפיל ("1D" ולא "D") — ההשוואה הזו לא תהיה true לעולם.');
+    }
+
+    taCallRe.lastIndex = 0;
+    if (taCallRe.test(ml)){
+      if (indent > 0) nestedLines.push(lineNo);
+      if (ml.includes('?') && ml.includes(':')) ternaryLines.push(lineNo);
+      if (/\b(and|or)\s+ta\.\w+\s*\(/.test(ml)) shortCircuitLines.push(lineNo);
+    }
+  });
+
+  if (nestedLines.length || ternaryLines.length || shortCircuitLines.length){
+    const parts = [];
+    if (nestedLines.length) parts.push('בתוך בלוק מקונן (הזחה): שורות ' + nestedLines.join(', '));
+    if (ternaryLines.length) parts.push('בתוך ביטוי טרינרי (?:): שורות ' + ternaryLines.join(', '));
+    if (shortCircuitLines.length) parts.push('אחרי and/or (lazy evaluation): שורות ' + shortCircuitLines.join(', '));
+    const firstLine = Math.min.apply(null, [].concat(nestedLines, ternaryLines, shortCircuitLines));
+    add(firstLine, 'warning', 'syntax', 'S14', 'פונקציית ta.* בעלת מצב נקראת מחוץ ל-scope גלובלי',
+      'פונקציות כמו ta.ema/ta.sma/ta.crossover שומרות מצב בין ברים וצריכות לרוץ בכל בר ב-scope גלובלי. קריאה להן בתוך if/טרינרי/אחרי and-or עלולה "להרעיב" אותן ולתת ערכים שגויים. מומלץ לחשב ב-scope גלובלי למשתנה, ורק אז להשתמש בו בתנאי.\n' + parts.join(' · '));
+  }
+
+  const hasIslast = /barstate\.islast/.test(maskedFull);
+  ['label','line','box','polyline'].forEach(t => {
+    const newRe = new RegExp('\\b' + t + '\\.new\\s*\\(', 'g');
+    const delRe = new RegExp('\\b' + t + '\\.delete\\s*\\(');
+    const count = (maskedFull.match(newRe) || []).length;
+    if (count > 0 && !hasIslast && !delRe.test(maskedFull)){
+      add(null, 'info', 'syntax', 'S15', 'יצירת ' + t + '.new() ללא ניהול/מחיקה',
+        'נמצאו ' + count + ' קריאות ל-' + t + '.new() בלי barstate.islast ובלי ' + t + '.delete() באף מקום. ב-v6 יש תקרה של 500 — אם זה רץ כל בר, הציור ייעצר בשקט אחרי שתגיע לתקרה.');
+    }
+  });
+
+  const secCalls = findCalls(maskedFull, origFull, /\brequest\.security\s*\(/g);
+  secCalls.forEach(c => {
+    const hasLookaheadOn = /lookahead\s*=\s*barmerge\.lookahead_on/.test(c.args);
+    const hasHistoryOffset = /\[\s*[1-9]\d*\s*\]/.test(c.args);
+    if (hasLookaheadOn && !hasHistoryOffset){
+      add(indexToLine(offsets, c.matchIndex), 'error', 'repaint', 'R1',
+        'lookahead_on בלי הפניה לערך סגור — דליפת עתיד אפשרית',
+        'lookahead = barmerge.lookahead_on בטוח רק כשמיושם על ביטוי עם [1] ומעלה (הבר הסגור הקודם). על הערך הנוכחי הלא־סגור זו קריאה מפורשת לעתיד שמנפחת את הבקטסט ומתפוצצת בלייב.',
+        'request.security(sym, "1D", close[1], lookahead = barmerge.lookahead_on)');
+    }
+  });
+
+  const strategyCalls = findCalls(maskedFull, origFull, /\bstrategy\s*\(/g);
+  strategyCalls.forEach(c => {
+    const ln = indexToLine(offsets, c.matchIndex);
+    if (!/\bcommission_value\s*=|\bcommission_type\s*=/.test(c.args)){
+      add(ln, 'info', 'strategy', 'T1', 'strategy() בלי commission_value/commission_type',
+        'בלי עמלה מוגדרת, תוצאות הבקטסט אופטימיות יותר ממה שיקרה בפועל.');
+    }
+    if (!/\bslippage\s*=/.test(c.args)){
+      add(ln, 'info', 'strategy', 'T2', 'strategy() בלי slippage',
+        'בלי slippage, פקודות market/stop ייראו ממולאות במחיר מושלם — לא ריאליסטי.');
+    }
+    if (!/\bmargin_long\s*=|\bmargin_short\s*=/.test(c.args)){
+      add(ln, 'info', 'strategy', 'T3', 'אין הגדרה מפורשת ל-margin_long/margin_short',
+        'ברירת המחדל ב-v6 היא 100 (בלי מינוף) — מתאים לחשבון cash בלי מרג׳ין, אבל כדאי להגדיר במפורש כדי לתעד את הכוונה.');
+    }
+    if (/\bcalc_on_every_tick\s*=\s*true/.test(c.args)){
+      add(ln, 'info', 'repaint', 'R4', 'calc_on_every_tick=true',
+        'זה גורם לאסטרטגיה להיכנס תוך־ברי בזמן אמת אבל על סגירת הבר בהיסטוריה — היסטוריה ולייב לא יתאמו. השאר false לבקטסט נקי אלא אם זה ממש נדרש.');
+    }
+  });
+
+  const entrySigCalls = findCalls(maskedFull, origFull, /\bstrategy\.(?:entry|close|close_all|order)\s*\(/g);
+  entrySigCalls.forEach(c => {
+    if (/\bwhen\s*=/.test(c.args)){
+      add(indexToLine(offsets, c.matchIndex), 'error', 'syntax', 'S10', "פרמטר 'when' הוסר ב-v6",
+        'ב-v5 אפשר היה strategy.entry(..., when = cond). ב-v6 הפרמטר הוסר — יש לעטוף ב-if במקום.',
+        'if cond\n    strategy.entry(...)');
+    }
+  });
+
+  const alertCalls = findCalls(maskedFull, origFull, /\balert\s*\(/g);
+  const anyAlert = alertCalls.length > 0;
+  let anyBarCloseFreq = false;
+  alertCalls.forEach(c => {
+    if (/\{\{/.test(c.argsOriginal)){
+      add(indexToLine(offsets, c.matchIndex), 'warning', 'alerts', 'A1', 'תבנית {{ }} בתוך alert()',
+        "placeholders כמו {{close}} עובדים רק בהודעה הסטטית של alertcondition()/בדיאלוג ההתראה — לא בתוך alert() התכנותי. בתוך alert() יש לבנות את הערך בעצמך, למשל str.tostring(close).");
+    }
+    if (/freq_once_per_bar_close/.test(c.args)) anyBarCloseFreq = true;
+    if (/str\.format/.test(c.args) && /\{\{"/.test(c.argsOriginal)){
+      add(indexToLine(offsets, c.matchIndex), 'info', 'alerts', 'A3', 'בניית JSON להתראה — לוודא תקינות',
+        'נראה שאתה בונה מחרוזת JSON עם str.format לשליחה ל-webhook. לפני חיבור לבוט אמיתי, ודא שהפלט בפועל הוא JSON תקין ושכל השדות שהצד השני מצפה להם קיימים.');
+    }
+  });
+  if (anyAlert && !anyBarCloseFreq){
+    add(null, 'info', 'alerts', 'A2', 'אין alert.freq_once_per_bar_close באף קריאת alert()',
+      'בלי freq_once_per_bar_close (או barstate.isconfirmed לפני הקריאה), ההתראה עלולה להישלח על תנאי שעדיין "מתנדנד" תוך־ברי ונעלם לפני שהבר נסגר.');
+  }
+
+  const hasIsConfirmed = /barstate\.isconfirmed/.test(maskedFull);
+  const hasEntries = /\bstrategy\.entry\s*\(/.test(maskedFull);
+  if ((hasEntries || anyAlert) && !hasIsConfirmed){
+    add(null, 'warning', 'repaint', 'R2', 'אין barstate.isconfirmed בכל הסקריפט',
+      'יש כניסות לעסקה ו/או alert() אבל בשום מקום לא נבדק barstate.isconfirmed. זו הסיבה השכיחה ביותר לכך שסיגנל "נראה אחרת" בלייב לעומת בקטסט.');
+  }
+
+  if (/ta\.pivot(high|low)\s*\(/.test(maskedFull)){
+    add(null, 'info', 'repaint', 'R3', 'ta.pivothigh/ta.pivotlow מתעכבים מטבעם',
+      'פונקציות אלה לא יכולות לאשר פיבוט עד שעוברים rightbars ברים נוספים — זה עיכוב מובנה, לא באג. אל תתייחס לפיבוט האחרון הלא־מאושר כניתן למסחר.');
+  }
+
+  if (/\bticker\.(heikinashi|renko|linebreak|kagi|pointfigure)\s*\(/.test(maskedFull) && hasStrategyEntry){
+    add(null, 'warning', 'repaint', 'R5', 'נתוני גרף סינתטיים (Heikin-Ashi/Renko/Kagi/PnF) יחד עם אסטרטגיה',
+      'הפונקציות האלה מייצרות מחירים מוחלקים/סינתטיים מתוך טווחי מחיר אמיתיים. הברוקר תמיד ימלא הזמנות במחיר השוק האמיתי, לא במחיר הסינתטי — אסור לבסס כניסות או בקטסט על הנתונים האלה, רק לתצוגה ויזואלית.');
+  }
+
+  return issues;
+}
+
+function summarize(issues){
+  const counts = { error: 0, warning: 0, info: 0 };
+  issues.forEach(it => { counts[it.severity] = (counts[it.severity] || 0) + 1; });
+  let status = 'pass';
+  if (counts.error > 0) status = 'blocked';
+  else if (counts.warning > 0) status = 'review';
+  return { counts, status, total: issues.length };
+}
+
+function computeScore(issues){
+  let score = 100;
+  issues.forEach(it => {
+    if (it.severity === 'error') score -= 20;
+    else if (it.severity === 'warning') score -= 8;
+    else score -= 2;
+  });
+  return Math.max(0, score);
+}
+
+function scoreColor(score){
+  if (score >= 85) return 'var(--pass)';
+  if (score >= 60) return 'var(--warn)';
+  return 'var(--error)';
+}
+
+function evaluateBacktestStats(input){
+  const errors = [];
+  const trades = Number(input.trades);
+  const winRatePct = Number(input.winRatePct);
+  const avgWin = Number(input.avgWin);
+  const avgLoss = Number(input.avgLoss);
+
+  if (!(trades > 0)) errors.push('מספר עסקאות חייב להיות גדול מ-0');
+  if (!(winRatePct >= 0 && winRatePct <= 100)) errors.push('אחוז הצלחה חייב להיות בין 0 ל-100');
+  if (!(avgWin > 0)) errors.push('רווח ממוצע חייב להיות גדול מ-0');
+  if (!(avgLoss > 0)) errors.push('הפסד ממוצע (כערך מוחלט) חייב להיות גדול מ-0');
+  if (errors.length) return { valid: false, errors };
+
+  const R = avgWin / avgLoss;
+  const breakeven = 100 / (1 + R);
+  const margin = winRatePct - breakeven;
+  const winFrac = winRatePct / 100;
+  const expectancy = (winFrac * avgWin) - ((1 - winFrac) * avgLoss);
+
+  let sampleVerdict;
+  if (trades < 30) sampleVerdict = 'אנקדוטה (פחות מ-30 עסקאות)';
+  else if (trades < 100) sampleVerdict = 'נקודת התחלה חלשה (30–99)';
+  else sampleVerdict = 'מדגם סביר בגודלו (100+)';
+
+  let tone = 'bad';
+  let bottomLine;
+  if (margin <= 0){
+    bottomLine = 'אחוז ההצלחה (' + winRatePct.toFixed(1) + '%) לא עובר את נקודת האיזון (' + breakeven.toFixed(1) + '%) עבור R=' + R.toFixed(2) + ' — אין כאן עדיין יתרון מוכח; התוצאה היא רעש סביב אפס.';
+    tone = 'bad';
+  } else if (margin < 5){
+    bottomLine = 'אחוז ההצלחה עובר את נקודת האיזון בכ-' + margin.toFixed(1) + ' נק׳ אחוז בלבד — שולי מאוד, רגיש לעלויות ולמדגם.';
+    tone = 'warn';
+  } else {
+    bottomLine = 'אחוז ההצלחה עובר את נקודת האיזון בכ-' + margin.toFixed(1) + ' נק׳ אחוז — יש רווחיות בגיליון הבדיקה, בתנאי שהעלויות והמדגם תקינים.';
+    tone = 'good';
+  }
+  if (!input.costsApplied){
+    bottomLine += ' שים לב: ציינת שעמלה/slippage לא נלקחו בחשבון — המספרים אופטימיים מדי ביחס למציאות.';
+    if (tone === 'good') tone = 'warn';
+  }
+  if (!input.multiRegime){
+    bottomLine += ' שים לב: אם הבדיקה היא על symbol/תקופה אחת בלבד — זו עדיין לא הוכחה ליתרון כללי.';
+  }
+  if (trades < 30 && tone === 'good') tone = 'warn';
+
+  return { valid: true, R, breakeven, margin, expectancy, sampleVerdict, bottomLine, tone };
+}
+
+/* ===================================================================
+   PURE-LOGIC:END
+   =================================================================== */
+
+const CLEAN_EXAMPLE = '//@version=6\n' +
+'strategy("Demo Clean EMA Cross", overlay = true,\n' +
+'     initial_capital = 10000,\n' +
+'     default_qty_type = strategy.percent_of_equity,\n' +
+'     default_qty_value = 10,\n' +
+'     commission_type = strategy.commission.percent,\n' +
+'     commission_value = 0.05,\n' +
+'     slippage = 2,\n' +
+'     margin_long = 100,\n' +
+'     margin_short = 100,\n' +
+'     calc_on_every_tick = false)\n\n' +
+'int fastLen = input.int(9, "Fast EMA", minval = 1)\n' +
+'int slowLen = input.int(21, "Slow EMA", minval = 1)\n\n' +
+'float fast = ta.ema(close, fastLen)\n' +
+'float slow = ta.ema(close, slowLen)\n\n' +
+'bool crossUp = ta.crossover(fast, slow)\n' +
+'bool crossDown = ta.crossunder(fast, slow)\n\n' +
+'bool goLong = crossUp and barstate.isconfirmed\n' +
+'bool goShort = crossDown and barstate.isconfirmed\n\n' +
+'if goLong\n' +
+'    strategy.entry("Long", strategy.long)\n' +
+'    alert("LONG entry", alert.freq_once_per_bar_close)\n\n' +
+'if goShort\n' +
+'    strategy.close("Long")\n' +
+'    alert("flat", alert.freq_once_per_bar_close)\n\n' +
+'plot(fast, "Fast", color.aqua)\n' +
+'plot(slow, "Slow", color.orange)\n';
+
+const BUGGY_EXAMPLE = '//@version=5\n' +
+'indicator("Demo With Issues", overlay=true)\n\n' +
+'bool flag = na\n\n' +
+'if close\n' +
+'    label.new(bar_index, high, "x")\n\n' +
+'len = input.int(14)\n' +
+'htf = request.security(syminfo.tickerid, "60", close, lookahead = barmerge.lookahead_on)\n\n' +
+'a = 5 / 2\n\n' +
+'type MyData\n' +
+'    float val\n\n' +
+'MyData d = MyData.new(val = close)\n' +
+'x = d.val[1]\n\n' +
+'strategy.entry("L", strategy.long, when = close > open)\n\n' +
+'alert("price is {{close}}")\n\n' +
+'plot(ta.sma(close, len), transp = 50, linewidth = 0)\n';
+
+const RULE_CATALOG = [
+  { id:'S0', cat:'syntax', t:'מספר סוגריים פותחים/סוגרים לא תואם' },
+  { id:'S1', cat:'syntax', t:'חסר //@version=6 כשורה הראשונה' },
+  { id:'S2', cat:'syntax', t:'יותר מתג //@version אחד' },
+  { id:'S3', cat:'syntax', t:'אין נקודת כניסה (indicator/strategy/library)' },
+  { id:'S4', cat:'syntax', t:'יותר מנקודת כניסה אחת' },
+  { id:'S5', cat:'syntax', t:"bool = na — לא חוקי ב-v6" },
+  { id:'S6', cat:'syntax', t:'תנאי if עם משתנה בודד — לוודא שהוא bool' },
+  { id:'S7', cat:'syntax', t:'חלוקת מספרים שלמים מילוליים (תוצאה עם שבר)' },
+  { id:'S8', cat:'syntax', t:'[] ישירות על שדה UDT' },
+  { id:'S9', cat:'syntax', t:'[] על קבוע/literal' },
+  { id:'S10', cat:'syntax', t:"פרמטר 'when' שהוסר מ-strategy.entry/close" },
+  { id:'S11', cat:'syntax', t:'פרמטר transp שהוסר' },
+  { id:'S12', cat:'syntax', t:'linewidth=0 לא חוקי' },
+  { id:'S13', cat:'syntax', t:'timeframe.period מושווה לאות בודדת ("D" וכו׳)' },
+  { id:'S14', cat:'syntax', t:'ta.* בעל מצב נקרא מחוץ ל-scope גלובלי' },
+  { id:'S15', cat:'syntax', t:'אובייקטי ציור (label/line/box/polyline) ללא ניהול' },
+  { id:'S16', cat:'syntax', t:'שימוש ב-strategy.* בתוך סקריפט indicator()' },
+  { id:'S17', cat:'syntax', t:'request.*() מקונן כש-dynamic_requests=false' },
+  { id:'R1', cat:'repaint', t:'lookahead_on בלי הפניה לערך סגור — דליפת עתיד' },
+  { id:'R2', cat:'repaint', t:'אין barstate.isconfirmed בכל הסקריפט' },
+  { id:'R3', cat:'repaint', t:'עיכוב מובנה ב-ta.pivothigh/ta.pivotlow' },
+  { id:'R4', cat:'repaint', t:'calc_on_every_tick=true (היסטוריה≠לייב)' },
+  { id:'R5', cat:'repaint', t:'גרף סינתטי (Heikin-Ashi/Renko/Kagi/PnF) עם אסטרטגיה' },
+  { id:'A1', cat:'alerts', t:"תבנית {{ }} בתוך alert() — לא עובדת שם" },
+  { id:'A2', cat:'alerts', t:'אין alert.freq_once_per_bar_close' },
+  { id:'A3', cat:'alerts', t:'בניית JSON ל-webhook — לוודא תקינות' },
+  { id:'T1', cat:'strategy', t:'strategy() בלי commission_value/type' },
+  { id:'T2', cat:'strategy', t:'strategy() בלי slippage' },
+  { id:'T3', cat:'strategy', t:'אין margin_long/margin_short מוגדר במפורש' }
+];
+
+const NOT_COVERED = [
+  'שגיאות תחביר כלליות שלא ברשימה הזו (טעות הקלדה בשם פונקציה, מספר ארגומנטים שגוי וכו׳) — רק קומפיילר אמיתי תופס את כל אלה.',
+  'אי-התאמות qualifier מסוג const/input/simple/series מעבר למקרים הספציפיים שנבדקים כאן.',
+  'namespaces חדשים/נישתיים כמו request.footprint() וטיפוסי footprint/volume_row.',
+  'נכונות לוגית/מתמטית של האסטרטגיה עצמה — האם לסיגנל יש בכלל יתרון (לכך נועד טאב הביצועים).',
+  'כל מה שתלוי בזמן ריצה בפועל מול נתוני מחיר אמיתיים — זה קורה רק בתוך TradingView.'
+];
+
+/* ===================================================================
+   DOM WIRING
+   =================================================================== */
+const codeInput = document.getElementById('codeInput');
+const runBtn = document.getElementById('runBtn');
+const clearBtn = document.getElementById('clearBtn');
+const loadCleanBtn = document.getElementById('loadCleanBtn');
+const loadBuggyBtn = document.getElementById('loadBuggyBtn');
+const lineCountEl = document.getElementById('lineCount');
+const charCountEl = document.getElementById('charCount');
+const statusBanner = document.getElementById('statusBanner');
+const resultsContainer = document.getElementById('resultsContainer');
+const gaugeArea = document.getElementById('gaugeArea');
+const copyReportBtn = document.getElementById('copyReportBtn');
+let lastIssues = [];
+
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-selected','false'); });
+    btn.classList.add('active'); btn.setAttribute('aria-selected','true');
+    const target = btn.getAttribute('data-tab');
+    document.querySelectorAll('.tab-panel').forEach(p => { p.hidden = p.getAttribute('data-panel') !== target; });
+  });
+});
+
+/* ---------- radial gauge (SVG) ---------- */
+function renderRadialGauge(container, value, label, sublabel){
+  const size = 110, stroke = 10, r = (size - stroke) / 2, c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(100, value)) / 100;
+  const offset = c * (1 - pct);
+  const center = size / 2;
+  const color = scoreColor(value);
+  container.innerHTML =
+    '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" class="gauge-svg">' +
+      '<circle cx="'+center+'" cy="'+center+'" r="'+r+'" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="'+stroke+'"/>' +
+      '<circle cx="'+center+'" cy="'+center+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="'+stroke+'" stroke-linecap="round" ' +
+        'stroke-dasharray="'+c+'" stroke-dashoffset="'+c+'" class="gauge-arc" transform="rotate(-90 '+center+' '+center+')"/>' +
+      '<text x="'+center+'" y="'+(center-2)+'" text-anchor="middle" class="gauge-value">'+Math.round(value)+'</text>' +
+      '<text x="'+center+'" y="'+(center+16)+'" text-anchor="middle" class="gauge-unit">/100</text>' +
+    '</svg>' +
+    '<div class="gauge-caption"><div class="gauge-label">'+escapeHtml(label)+'</div><div class="gauge-sublabel">'+escapeHtml(sublabel)+'</div></div>';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const arc = container.querySelector('.gauge-arc');
+      if (arc) arc.style.strokeDashoffset = offset;
+    });
+  });
+}
+
+function renderDistBar(container, counts){
+  const total = counts.error + counts.warning + counts.info;
+  let html = '<div class="dist-bar">';
+  if (total === 0){
+    html += '<div class="dist-seg" style="width:100%;background:rgba(255,255,255,0.08);"></div>';
+  } else {
+    html += '<div class="dist-seg" style="width:'+(counts.error/total*100)+'%;background:var(--error);"></div>';
+    html += '<div class="dist-seg" style="width:'+(counts.warning/total*100)+'%;background:var(--warn);"></div>';
+    html += '<div class="dist-seg" style="width:'+(counts.info/total*100)+'%;background:var(--info);"></div>';
+  }
+  html += '</div><div class="dist-legend">' +
+    '<span><i class="dist-dot" style="background:var(--error);"></i>'+counts.error+' שגיאות</span>' +
+    '<span><i class="dist-dot" style="background:var(--warn);"></i>'+counts.warning+' אזהרות</span>' +
+    '<span><i class="dist-dot" style="background:var(--info);"></i>'+counts.info+' מידע</span></div>';
+  container.innerHTML = html;
+}
+
+function updateMeta(){
+  const v = codeInput.value;
+  const lines = v.length ? v.split('\n').length : 0;
+  lineCountEl.textContent = lines + ' שורות';
+  charCountEl.textContent = v.length + ' תווים';
+}
+codeInput.addEventListener('input', updateMeta);
+updateMeta();
+
+function jumpToLine(lineNo){
+  if (!lineNo) return;
+  document.querySelector('.tab-btn[data-tab="validator"]').click();
+  const lines = codeInput.value.split('\n');
+  let idx = 0;
+  for (let i = 0; i < lineNo - 1 && i < lines.length; i++){ idx += lines[i].length + 1; }
+  const lineLen = (lines[lineNo-1] || '').length;
+  codeInput.focus();
+  codeInput.setSelectionRange(idx, idx + lineLen);
+  const lineHeight = parseFloat(getComputedStyle(codeInput).lineHeight) || 20;
+  codeInput.scrollTop = Math.max(0, (lineNo - 4) * lineHeight);
+}
+
+function buildReportText(issues, summary){
+  const lines = [];
+  lines.push('PREFLIGHT — דוח בדיקת טרום-טיסה (Pine Script v6)');
+  lines.push('סטטוס: ' + (summary.status==='blocked'?'לא מוכן':summary.status==='review'?'דורש בדיקה':'תקין מבחינת הרשימה'));
+  lines.push('שגיאות: '+summary.counts.error+' | אזהרות: '+summary.counts.warning+' | מידע: '+summary.counts.info);
+  lines.push('');
+  issues.forEach(it => {
+    lines.push('['+it.severity.toUpperCase()+'] '+it.ruleId+(it.line?(' שורה '+it.line):' (כלל הקובץ)')+' — '+it.title);
+    lines.push('  '+it.detail.replace(/\n/g,' '));
+  });
+  return lines.join('\n');
+}
+
+function renderResults(issues){
+  lastIssues = issues;
+  const summary = summarize(issues);
+  const score = computeScore(issues);
+
+  statusBanner.className = 'status-banner ' + summary.status;
+  const headline = statusBanner.querySelector('.headline');
+  const sub = statusBanner.querySelector('.sub');
+  if (summary.status === 'blocked'){
+    headline.textContent = 'לא מוכן — ' + summary.counts.error + ' שגיאות';
+    sub.textContent = summary.counts.warning + ' אזהרות, ' + summary.counts.info + ' הערות מידע.';
+  } else if (summary.status === 'review'){
+    headline.textContent = 'דורש בדיקה — ' + summary.counts.warning + ' אזהרות';
+    sub.textContent = 'אין שגיאות חוסמות. ' + summary.counts.info + ' הערות מידע נוספות.';
+  } else {
+    headline.textContent = 'לא נמצאו בעיות מהרשימה';
+    sub.textContent = (summary.counts.info ? summary.counts.info + ' הערות מידע — ' : '') + 'מומלץ עדיין להריץ בפועל ב-TradingView.';
+  }
+
+  gaugeArea.style.display = 'flex';
+  gaugeArea.innerHTML = '<div id="gaugeSvgHolder"></div><div id="distHolder" style="flex:1;min-width:160px;"></div>';
+  renderRadialGauge(document.getElementById('gaugeSvgHolder'), score, 'ציון טרום-טיסה', 'מבוסס על 29 כללים בלבד — לא קומפילציה אמיתית');
+  renderDistBar(document.getElementById('distHolder'), summary.counts);
+
+  copyReportBtn.style.display = issues.length ? 'inline-flex' : 'none';
+
+  if (!issues.length){
+    resultsContainer.innerHTML = '<div class="empty-state">לא נמצאו ממצאים מרשימת 29 הכללים. זה לא אומר שלאסטרטגיה יש יתרון — רק שלא נתפסו בעיות מבנה/ריפיינטינג ידועות. ראה טאב "כיסוי" למה זה לא בודק.</div>';
+    return;
+  }
+
+  const byCategory = {};
+  issues.forEach(it => { (byCategory[it.category] = byCategory[it.category] || []).push(it); });
+
+  let html = '';
+  Object.keys(CATEGORY_LABELS).forEach(catKey => {
+    const list = byCategory[catKey];
+    if (!list || !list.length) return;
+    list.sort((a,b) => (SEVERITY_ORDER[a.severity]-SEVERITY_ORDER[b.severity]) || ((a.line||9999)-(b.line||9999)));
+    html += '<div class="cat-group"><div class="cat-head">' + escapeHtml(CATEGORY_LABELS[catKey]) + ' · ' + list.length + '</div>';
+    list.forEach((it, idx) => {
+      html += '<div class="issue-card ' + it.severity + '" style="animation-delay:' + (idx*40) + 'ms;">';
+      html += '<div class="issue-top"><div class="issue-title-row">';
+      html += '<span class="sev-chip ' + it.severity + '">' + SEVERITY_MARK[it.severity] + ' ' + it.ruleId + '</span>';
+      html += '<span class="issue-title">' + escapeHtml(it.title) + '</span></div>';
+      html += it.line ? '<button class="line-jump" data-line="'+it.line+'">שורה '+it.line+'</button>' : '<span class="line-jump" style="opacity:.5;cursor:default;">כלל הקובץ</span>';
+      html += '</div>';
+      html += '<div class="issue-detail">' + escapeHtml(it.detail) + '</div>';
+      if (it.fix) html += '<div class="issue-fix ltr">' + escapeHtml(it.fix) + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+  resultsContainer.innerHTML = html;
+  resultsContainer.querySelectorAll('.line-jump[data-line]').forEach(btn => {
+    btn.addEventListener('click', () => jumpToLine(parseInt(btn.getAttribute('data-line'), 10)));
+  });
+}
+
+runBtn.addEventListener('click', () => renderResults(runAllChecks(codeInput.value)));
+
+clearBtn.addEventListener('click', () => {
+  codeInput.value = ''; updateMeta();
+  statusBanner.className = 'status-banner idle';
+  statusBanner.querySelector('.headline').textContent = 'מחכה להרצה';
+  statusBanner.querySelector('.sub').textContent = 'הדבק קוד ולחץ "הרץ בדיקה"';
+  gaugeArea.style.display = 'none'; gaugeArea.innerHTML = '';
+  copyReportBtn.style.display = 'none';
+  resultsContainer.innerHTML = '<div class="empty-state">תוצאות הבדיקה יופיעו כאן.</div>';
+});
+
+loadCleanBtn.addEventListener('click', () => { codeInput.value = CLEAN_EXAMPLE; updateMeta(); });
+loadBuggyBtn.addEventListener('click', () => { codeInput.value = BUGGY_EXAMPLE; updateMeta(); });
+
+copyReportBtn.addEventListener('click', async () => {
+  const text = buildReportText(lastIssues, summarize(lastIssues));
+  try {
+    await navigator.clipboard.writeText(text);
+    const orig = copyReportBtn.textContent;
+    copyReportBtn.textContent = 'הועתק ✓';
+    setTimeout(() => { copyReportBtn.textContent = orig; }, 1600);
+  } catch(e){ console.error('copy failed', e); }
+});
+
+/* ---------- performance tab ---------- */
+const calcBtn = document.getElementById('calcBtn');
+const calcErr = document.getElementById('calcErr');
+const calcOut = document.getElementById('calcOut');
+const verdictBox = document.getElementById('verdictBox');
+const breakevenFill = document.getElementById('breakevenFill');
+const breakevenMarker = document.getElementById('breakevenMarker');
+
+calcBtn.addEventListener('click', () => {
+  const result = evaluateBacktestStats({
+    trades: document.getElementById('trades').value,
+    winRatePct: document.getElementById('winRate').value,
+    avgWin: document.getElementById('avgWin').value,
+    avgLoss: document.getElementById('avgLoss').value,
+    costsApplied: document.getElementById('costsApplied').checked,
+    multiRegime: document.getElementById('multiRegime').checked
+  });
+  if (!result.valid){
+    calcErr.textContent = result.errors.join(' · ');
+    calcOut.style.display = 'none';
+    return;
+  }
+  calcErr.textContent = '';
+  calcOut.style.display = 'block';
+  document.getElementById('outR').textContent = result.R.toFixed(2);
+  document.getElementById('outBreakeven').textContent = result.breakeven.toFixed(1) + '%';
+  document.getElementById('outMargin').textContent = (result.margin >= 0 ? '+' : '') + result.margin.toFixed(1) + ' נק׳';
+  document.getElementById('outExpectancy').textContent = result.expectancy.toFixed(3);
+  document.getElementById('outSample').textContent = result.sampleVerdict;
+  verdictBox.textContent = result.bottomLine;
+  verdictBox.className = 'verdict-box ' + (result.tone === 'good' ? 'good' : result.tone === 'bad' ? 'bad' : '');
+
+  const winRatePct = Number(document.getElementById('winRate').value);
+  breakevenMarker.style.left = result.breakeven + '%';
+  breakevenFill.className = 'breakeven-fill ' + (result.tone === 'good' ? 'good' : result.tone === 'bad' ? 'bad' : 'warn');
+  breakevenFill.style.width = '0%';
+  requestAnimationFrame(() => { requestAnimationFrame(() => { breakevenFill.style.width = winRatePct + '%'; }); });
+});
+
+/* ---------- coverage tab ---------- */
+(function renderCoverage(){
+  const grid = document.getElementById('ruleGrid');
+  grid.innerHTML = RULE_CATALOG.map(r =>
+    '<div class="rule-card"><span class="rule-id">'+r.id+'</span><span class="rule-t">'+escapeHtml(r.t)+'</span></div>'
+  ).join('');
+  document.getElementById('notCoveredList').innerHTML = NOT_COVERED.map(t => '<li>'+escapeHtml(t)+'</li>').join('');
+})();
+
+/* ---------- library (window.storage) ---------- */
+const saveNameInput = document.getElementById('saveNameInput');
+const saveBtn = document.getElementById('saveBtn');
+const refreshLibBtn = document.getElementById('refreshLibBtn');
+const libGrid = document.getElementById('libGrid');
+const STORAGE_PREFIX = 'pine-scripts:';
+
+function sanitizeKey(name){
+  return name.trim().toLowerCase()
+    .replace(/['"]/g, '').replace(/\s+/g, '-').replace(/[\\/]/g, '-')
+    .replace(/[^a-z0-9\-_.\u0590-\u05FF]/g, '').slice(0, 150);
+}
+async function saveScript(name, code){
+  const slug = sanitizeKey(name);
+  if (!slug) return false;
+  try {
+    const res = await window.storage.set(STORAGE_PREFIX + slug, JSON.stringify({ name, code, savedAt: new Date().toISOString() }), false);
+    return !!res;
+  } catch (e){ console.error('save failed', e); return false; }
+}
+async function listScriptKeys(){
+  try { const res = await window.storage.list(STORAGE_PREFIX, false); return (res && res.keys) ? res.keys : []; }
+  catch (e){ console.error('list failed', e); return []; }
+}
+async function loadScriptByKey(key){
+  try { const res = await window.storage.get(key, false); return res ? JSON.parse(res.value) : null; }
+  catch (e){ console.error('load failed', e); return null; }
+}
+async function deleteScriptByKey(key){
+  try { await window.storage.delete(key, false); return true; }
+  catch (e){ console.error('delete failed', e); return false; }
+}
+function fmtDate(iso){
+  try { return new Date(iso).toLocaleDateString('he-IL', {year:'numeric',month:'short',day:'numeric'}); }
+  catch(e){ return ''; }
+}
+async function refreshLibrary(){
+  libGrid.innerHTML = '<div class="lib-empty">טוען…</div>';
+  const keys = await listScriptKeys();
+  if (!keys.length){ libGrid.innerHTML = '<div class="lib-empty">אין עדיין סקריפטים שמורים.</div>'; return; }
+  const items = await Promise.all(keys.map(async k => {
+    const data = await loadScriptByKey(k);
+    return { key: k, name: (data && data.name) ? data.name : k.replace(STORAGE_PREFIX,''), savedAt: data ? data.savedAt : '' };
+  }));
+  libGrid.innerHTML = items.map(it =>
+    '<div class="lib-card"><span class="name" title="'+escapeHtml(it.name)+'">'+escapeHtml(it.name)+'</span>' +
+    '<span class="date">'+escapeHtml(fmtDate(it.savedAt))+'</span>' +
+    '<span class="actions"><button class="btn small" data-load="'+escapeHtml(it.key)+'">טען</button>' +
+    '<button class="btn small ghost" data-del="'+escapeHtml(it.key)+'">מחק</button></span></div>'
+  ).join('');
+  libGrid.querySelectorAll('[data-load]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const data = await loadScriptByKey(btn.getAttribute('data-load'));
+      if (data && typeof data.code === 'string'){
+        codeInput.value = data.code; updateMeta();
+        document.querySelector('.tab-btn[data-tab="validator"]').click();
+      }
+    });
+  });
+  libGrid.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', async () => { await deleteScriptByKey(btn.getAttribute('data-del')); refreshLibrary(); });
+  });
+}
+saveBtn.addEventListener('click', async () => {
+  const name = saveNameInput.value.trim();
+  if (!name){ saveNameInput.focus(); return; }
+  if (!codeInput.value.trim()) return;
+  saveBtn.disabled = true;
+  const ok = await saveScript(name, codeInput.value);
+  saveBtn.disabled = false;
+  if (ok){ saveNameInput.value = ''; refreshLibrary(); }
+});
+refreshLibBtn.addEventListener('click', refreshLibrary);
+refreshLibrary();
+
+</script>
+</body>
+</html>
