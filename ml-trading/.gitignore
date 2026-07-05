@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+data/
+reports/
+.pytest_cache/
+.ruff_cache/
+rust/trading-core/target/
+*.so
+optuna.db
