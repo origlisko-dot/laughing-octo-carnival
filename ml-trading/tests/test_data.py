@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import polars as pl
 import pytest
@@ -26,7 +26,7 @@ def test_synthetic_provider_valid(bars_1m: pl.DataFrame) -> None:
 def test_validation_catches_bad_ohlc() -> None:
     df = pl.DataFrame(
         {
-            "ts": [datetime(2025, 1, 6, 14, m, tzinfo=timezone.utc) for m in range(3)],
+            "ts": [datetime(2025, 1, 6, 14, m, tzinfo=UTC) for m in range(3)],
             "open": [10.0, 10.0, 10.0],
             "high": [9.0, 11.0, 11.0],  # first bar: high < open
             "low": [8.0, 9.5, -1.0],  # last bar: negative price

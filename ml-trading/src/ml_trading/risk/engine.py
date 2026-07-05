@@ -14,12 +14,12 @@ ML/DRL layers pass a `size_multiplier` in (0, 1]; it can only shrink a trade.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 from ml_trading.config import RiskLimits
 
 
-class Rejection(str, Enum):
+class Rejection(StrEnum):
     RISK_REWARD = "risk_reward_below_minimum"
     KILL_SWITCH = "daily_loss_kill_switch"
     MAX_POSITIONS = "max_open_positions"

@@ -38,7 +38,8 @@ def proposal(**kw) -> TradeProposal:
 def test_position_sizing_matches_risk_budget(engine, state) -> None:
     d = engine.evaluate(proposal(), state)
     assert d.approved
-    # 1% of 100k = $1000 risk budget; $1/share risk; Kelly cap p=0.5,rr=2 => f*=0.25, cap 0.5*0.25=0.125 > 0.01
+    # 1% of 100k = $1000 risk budget at $1/share risk.
+    # Kelly cap: p=0.5, rr=2 => f*=0.25, capped 0.5*0.25=0.125 > 0.01, so it doesn't bind.
     assert d.qty == 1000
     assert d.risk_amount == pytest.approx(1000.0)
     assert d.rr_ratio == pytest.approx(2.0)

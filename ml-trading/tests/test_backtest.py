@@ -101,7 +101,7 @@ def test_walk_forward_and_report(bars, tmp_path) -> None:
                                      model_params={"n_estimators": 60})
     assert len(outcomes) >= 2
     # test windows must not overlap and must be ordered
-    for a, b in zip(outcomes, outcomes[1:]):
+    for a, b in zip(outcomes, outcomes[1:], strict=False):
         assert a.test_end <= b.test_start
 
     s = summarize(outcomes)

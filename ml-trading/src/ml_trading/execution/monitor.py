@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import numpy as np
@@ -42,7 +42,7 @@ class TradeLog:
 
     @staticmethod
     def now() -> str:
-        return datetime.now(timezone.utc).isoformat()
+        return datetime.now(UTC).isoformat()
 
 
 def drift_report(live_returns: np.ndarray, backtest_returns: np.ndarray) -> dict:

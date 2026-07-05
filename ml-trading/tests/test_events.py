@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import numpy as np
 
@@ -12,7 +12,7 @@ from ml_trading.events.classify import (
 from ml_trading.events.impact import ImpactModel, catalyst_features, is_fresh, measure_reaction
 from ml_trading.events.ingest import EdgarClient, NewsItem, dedup_items, link_tickers
 
-TS = datetime(2025, 3, 3, 14, 30, tzinfo=timezone.utc)
+TS = datetime(2025, 3, 3, 14, 30, tzinfo=UTC)
 
 
 def item(headline: str, **kw) -> NewsItem:

@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from xml.etree import ElementTree
 
 import httpx
@@ -82,11 +82,11 @@ class EdgarClient:
             try:
                 ts = datetime.fromisoformat(updated)
             except ValueError:
-                ts = datetime.now(timezone.utc)
+                ts = datetime.now(UTC)
             items.append(
                 NewsItem(
                     id=_item_id("edgar", href or title),
-                    ts=ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc),
+                    ts=ts if ts.tzinfo else ts.replace(tzinfo=UTC),
                     source="edgar",
                     headline=title,
                     url=href,
@@ -115,7 +115,7 @@ class FinnhubNewsClient:
             items.append(
                 NewsItem(
                     id=_item_id("finnhub", str(row.get("id", row.get("url", "")))),
-                    ts=datetime.fromtimestamp(row["datetime"], tz=timezone.utc),
+                    ts=datetime.fromtimestamp(row["datetime"], tz=UTC),
                     source="finnhub",
                     headline=row.get("headline", ""),
                     body=row.get("summary", ""),

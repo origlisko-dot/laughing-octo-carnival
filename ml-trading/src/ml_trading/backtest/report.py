@@ -44,7 +44,8 @@ def render_report(outcomes: list[FoldOutcome], title: str, out_path: str | Path)
             for v in m.values()
         )
         rows.append(f"<tr><td>fold {o.fold}</td>{cells}</tr>")
-    header = "".join(f"<th>{html.escape(k)}</th>" for k in (outcomes[0].metrics.as_dict() if outcomes else {}))
+    metric_names = outcomes[0].metrics.as_dict() if outcomes else {}
+    header = "".join(f"<th>{html.escape(k)}</th>" for k in metric_names)
     summary_cells = "".join(f"<td>{v:,.3f}</td>" for v in summary.values())
     curves = "".join(
         f"<h3>fold {o.fold} equity</h3>{_sparkline(o.result.equity_curve.tolist())}" for o in outcomes

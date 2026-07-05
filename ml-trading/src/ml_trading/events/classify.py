@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 
 from ml_trading.events.ingest import NewsItem
 
@@ -23,7 +23,7 @@ except ImportError:  # optional extra
     hf_pipeline = None
 
 
-class CatalystType(str, Enum):
+class CatalystType(StrEnum):
     MERGER_ACQUISITION = "m&a"
     PARTNERSHIP = "partnership"
     TECH_BREAKTHROUGH = "tech_breakthrough"
@@ -45,12 +45,18 @@ class Catalyst:
 _PATTERNS: list[tuple[CatalystType, int, float, str]] = [
     (CatalystType.MERGER_ACQUISITION, 1, 0.9, r"\b(acquir\w+|merger|takeover|buyout|to acquire)\b"),
     (CatalystType.MERGER_ACQUISITION, 1, 0.7, r"\b(m&a|tender offer|all-cash deal)\b"),
-    (CatalystType.PARTNERSHIP, 1, 0.6, r"\b(partnership|collaborat\w+|joint venture|strategic alliance)\b"),
+    (
+        CatalystType.PARTNERSHIP, 1, 0.6,
+        r"\b(partnership|collaborat\w+|joint venture|strategic alliance)\b",
+    ),
     (CatalystType.TECH_BREAKTHROUGH, 1, 0.7, r"\b(breakthrough|patent granted|milestone|first-in-class)\b"),
     (CatalystType.REGULATORY, 1, 0.8, r"\b(fda approv\w+|clearance granted|approval received)\b"),
     (CatalystType.REGULATORY, -1, 0.8, r"\b(fda reject\w+|crl|complete response letter|recall\w*)\b"),
     (CatalystType.GUIDANCE, 1, 0.7, r"\b(raises? (?:full.year |annual )?guidance|beats? estimates)\b"),
-    (CatalystType.GUIDANCE, -1, 0.7, r"\b(cuts? guidance|lowers? guidance|misses? estimates|profit warning)\b"),
+    (
+        CatalystType.GUIDANCE, -1, 0.7,
+        r"\b(cuts? guidance|lowers? guidance|misses? estimates|profit warning)\b",
+    ),
     (CatalystType.LEGAL, -1, 0.6, r"\b(lawsuit|class action|investigation|subpoena|fraud)\b"),
 ]
 

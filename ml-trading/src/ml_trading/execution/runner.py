@@ -18,7 +18,6 @@ from ml_trading.config import AppConfig
 from ml_trading.execution.broker import BracketOrder, Broker
 from ml_trading.execution.imbalance import ImbalanceGuard, tick_rule_imbalance
 from ml_trading.execution.monitor import TradeLog, TradeRecord
-from ml_trading.features.indicators import atr
 from ml_trading.features.pipeline import base_features, feature_columns
 from ml_trading.models.tabular import TabularModel
 from ml_trading.risk.engine import PortfolioState, RiskEngine, TradeProposal, atr_levels
