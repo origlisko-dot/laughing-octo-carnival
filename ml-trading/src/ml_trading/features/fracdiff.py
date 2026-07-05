@@ -21,10 +21,17 @@ def ffd_weights(d: float, threshold: float = 1e-5, max_width: int = 10_000) -> n
     return np.asarray(w)
 
 
-def frac_diff_ffd(x: np.ndarray, d: float, threshold: float = 1e-5) -> np.ndarray:
-    """Apply FFD to a 1-D series. First len(weights)-1 values are NaN (insufficient history)."""
+def frac_diff_ffd(
+    x: np.ndarray, d: float, threshold: float = 1e-5, max_width: int = 10_000
+) -> np.ndarray:
+    """Apply FFD to a 1-D series. First len(weights)-1 values are NaN (insufficient history).
+
+    `max_width` truncates the weight window: small d values decay slowly and an
+    unbounded window would consume most of the sample as warm-up. Truncation adds
+    a small bias but keeps the feature usable on finite intraday histories.
+    """
     x = np.asarray(x, dtype=float)
-    w = ffd_weights(d, threshold)
+    w = ffd_weights(d, threshold, max_width)
     width = len(w)
     out = np.full_like(x, np.nan)
     if width > len(x):
@@ -63,6 +70,7 @@ def min_ffd_order(
     x: np.ndarray,
     d_grid: np.ndarray | None = None,
     adf_threshold: float = -2.86,
+    max_width: int = 10_000,
 ) -> float:
     """Smallest d in the grid whose FFD series passes the ADF test (5% level).
 
@@ -71,7 +79,7 @@ def min_ffd_order(
     if d_grid is None:
         d_grid = np.arange(0.1, 1.0, 0.05)
     for d in d_grid:
-        series = frac_diff_ffd(x, float(d))
+        series = frac_diff_ffd(x, float(d), max_width=max_width)
         if np.isnan(series).all():
             continue
         if adf_stat(series) < adf_threshold:

@@ -13,16 +13,22 @@ from ml_trading.features.mtf import align_multi_timeframe
 NON_FEATURE_COLS = ("ts", "open", "high", "low", "close", "volume")
 
 
-def base_features(df: pl.DataFrame, ffd_d: float | None = None) -> pl.DataFrame:
-    """Indicators + candles + cyclical + fractionally differentiated log price for one interval."""
+def base_features(
+    df: pl.DataFrame, ffd_d: float | None = None, ffd_max_width: int = 300
+) -> pl.DataFrame:
+    """Indicators + candles + cyclical + fractionally differentiated log price for one interval.
+
+    The FFD window is capped at `ffd_max_width` bars so the warm-up period stays
+    bounded relative to the sample (unbounded windows can eat most of an intraday history).
+    """
     out = indicator_features(df.sort("ts"))
     out = candle_features(out)
     out = cyclical_features(out)
 
     log_close = out.select(pl.col("close").log()).to_series().to_numpy()
-    d = ffd_d if ffd_d is not None else min_ffd_order(log_close)
+    d = ffd_d if ffd_d is not None else min_ffd_order(log_close, max_width=ffd_max_width)
     out = out.with_columns(
-        pl.Series("ffd_close", frac_diff_ffd(log_close, d)),
+        pl.Series("ffd_close", frac_diff_ffd(log_close, d, max_width=ffd_max_width)),
         pl.lit(d).alias("ffd_d"),
     )
     return out
