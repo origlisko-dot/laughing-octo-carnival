@@ -1,0 +1,13 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "trading-core"
+version = "0.1.0"
+description = "Rust acceleration core for ml-trading: backtest hot loop, candle patterns, risk math"
+requires-python = ">=3.12"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "trading_core"
